@@ -1,84 +1,104 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
+const mongooseAggregatePaginate = require('mongoose-aggregate-paginate-v2');
 
-const PostsSchema = new Schema({
-    content: {
-        type: String
+const PostsSchema = new Schema(
+    {
+        content: {
+            type: String,
+            trim: true,
+        },
+        date: {
+            type: Date,
+            default: Date.now,
+            get: v => v.getTime(),
+        },
+        user: {
+            type: Schema.Types.ObjectId,
+            ref: 'Users', // Kết nối đúng với schema `Users`
+            required: true,
+        },
+        media: [
+            {
+                type: Schema.Types.ObjectId,
+                ref: 'Media',
+            }
+        ],
+        likes: [
+            {
+                type: Schema.Types.ObjectId,
+                ref: 'Likes',
+            }
+        ],
+        comments: [
+            {
+                type: Schema.Types.ObjectId,
+                ref: 'Comments',
+            }
+        ],
     },
-    date: {
-        type: Date,
-        default: Date.now,
-        get: v => v.getTime() // Để format date thành timestamp number như JsonFormat.Shape.NUMBER
-    },
-    user: {
-        type: Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
-    },
-    media: [{
-        type: Schema.Types.ObjectId,
-        ref: 'Media'
-    }],
-    likes: [{
-        type: Schema.Types.ObjectId,
-        ref: 'Like'
-    }],
-    comments: [{
-        type: Schema.Types.ObjectId,
-        ref: 'Comment'
-    }]
-}, {
-    timestamps: true,
-    toJSON: { 
-        getters: true // Để đảm bảo getter của date được áp dụng khi chuyển đổi sang JSON
+    {
+        timestamps: true,
+        toJSON: {
+            getters: true,
+            virtuals: true,
+        },
+        toObject: {
+            getters: true,
+            virtuals: true,
+        },
     }
+);
+
+// Middleware auto-populate để đảm bảo chuẩn response
+PostsSchema.pre(/^find/, function (next) {
+    this.populate({
+        path: 'user',
+        select: 'id displayName username email gender university year roles',
+    })
+        .populate({
+            path: 'media',
+            select: 'id contentType contentSize name filePath',
+        })
+        .populate({
+            path: 'likes',
+            select: 'id type date user',
+            populate: {
+                path: 'user',
+                select: 'id username',
+            },
+        })
+        .populate({
+            path: 'comments',
+            select: 'id content date user',
+            populate: {
+                path: 'user',
+                select: 'id username',
+            },
+        });
+    next();
 });
 
-// Virtually populate để lấy media, likes và comments
-PostsSchema.virtual('mediaList', {
-    ref: 'Media',
-    localField: '_id',
-    foreignField: 'post'
-});
 
-PostsSchema.virtual('likesList', {
-    ref: 'Like',
-    localField: '_id',
-    foreignField: 'post'
-});
-
-PostsSchema.virtual('commentsList', {
-    ref: 'Comment',
-    localField: '_id',
-    foreignField: 'post'
-});
-
-// Đảm bảo virtuals được include khi chuyển đổi sang JSON
-PostsSchema.set('toJSON', { virtuals: true });
-PostsSchema.set('toObject', { virtuals: true });
-
-// Static method để tạo Posts mới (tương đương constructor trong Java)
-PostsSchema.statics.createPosts = function(id, content, date, user, media, likes, comments) {
-    return new this({
-        _id: id,
-        content,
-        date,
-        user,
-        media,
-        likes,
-        comments
-    });
+// Static method để tạo mới bài post
+PostsSchema.statics.create = function(data) {
+    return new this(data);
 };
 
-// Middleware để auto-populate các fields khi query
+
+// Middleware auto-populate khi query
 PostsSchema.pre(/^find/, function(next) {
     this.populate('user')
-        .populate('media')
+        .populate({
+            path: 'media',
+            model: 'Media', // Kết nối với model Media
+        })
         .populate('likes')
         .populate('comments');
     next();
 });
 
-const Posts = mongoose.model('Posts', PostsSchema);
+// Sử dụng mongooseAggregatePaginate plugin
+PostsSchema.plugin(mongooseAggregatePaginate);
 
-module.exports = Posts;
+module.exports = mongoose.models.Posts || mongoose.model('Posts', PostsSchema);

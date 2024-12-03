@@ -16,11 +16,11 @@ router.post('/token', async (req, res) => {
 
     if (!username || !password) {
         return res.status(400).json({ message: 'Missing username or password' });
-    }
+    };
 
     try {
         // Tìm người dùng trong DB
-        const user = await User.findOne({ username });
+        const user = await User.findOne({ username }).populate('roles');
         if (!user) {
             return res.status(400).json({ message: 'Không tìm thấy người dùng' });
         }
@@ -31,17 +31,25 @@ router.post('/token', async (req, res) => {
             return res.status(400).json({ message: 'Mật khẩu không khớp' });
         }
 
-        // Tạo JWT token
-        const token = jwt.sign({ id: user._id, username: user.username }, jwtSecret, { expiresIn: jwtExpiresIn });
+        // Tạo JWT accessToken
+        const accessToken = jwt.sign({ id: user._id, username: user.username }, jwtSecret, { expiresIn: jwtExpiresIn });
 
-        // Trả về token cùng thông tin người dùng
+        // Trả về accessToken cùng thông tin người dùng
         res.status(200).json({
+            status : 200,
             message: 'Đăng nhập thành công',
-            token: token,
+            accessToken: accessToken,
             user: {
                 username: user.username,
                 displayName: user.displayName,
                 email: user.email
+            },
+            data: {
+                id: user._id,
+                username: user.username,
+                displayName: user.displayName,
+                email: user.email,
+                role: user.roles[0]
             }
         });
     } catch (error) {

@@ -60,7 +60,7 @@ router.get('/check-in', authenticateToken, async (req, res) => {
         console.log("Ip công ty là :", serverIP);
 
         // Phản hồi kết quả
-        res.status(201).json({
+        res.status(200).json({
             message: ip === serverIP ? 'Đã CheckIn tại công ty' : 'Đã CheckIn ngoài công ty',
             ...timeSheet.toJSON(),
         });

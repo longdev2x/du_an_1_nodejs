@@ -6,7 +6,7 @@ const verifyToken = require('../middlewares/auth.middleware');
 // Lấy danh sách tất cả các tracking
 router.get('/', verifyToken, async (req, res) => {
     try {
-        const trackings = await Tracking.find();
+        const trackings = await Tracking.find().populate('user');
         res.status(200).json(trackings);  // Trả về danh sách tracking
     } catch (error) {
         console.error(error);
@@ -29,8 +29,15 @@ router.post('/', verifyToken, async (req, res) => {
             user
         });
 
+        // Lưu trước
         await newTracking.save();
-        res.status(201).json(newTracking);  // Trả về tracking đã tạo
+        // Sau khi lưu xong, gọi populate
+        await newTracking.populate({
+            path: 'user',
+            select: '-_id -roles',
+        });
+
+        res.status(200).json(newTracking);  // Trả về tracking đã tạo
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
@@ -40,7 +47,7 @@ router.post('/', verifyToken, async (req, res) => {
 // Cập nhật một tracking (theo ID)
 router.post('/:id', verifyToken, async (req, res) => {
     const { id } = req.params;
-    const { content, date} = req.body;
+    const { content, date } = req.body;
 
     if (!content) {
         return res.status(400).json({ message: 'Missing required fields' });
@@ -50,7 +57,7 @@ router.post('/:id', verifyToken, async (req, res) => {
     try {
         const updatedTracking = await Tracking.findByIdAndUpdate(
             id,
-            { content, date},
+            { content, date },
             { new: true }  // Trả về bản ghi đã được cập nhật
         );
 

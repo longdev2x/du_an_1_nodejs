@@ -31,7 +31,7 @@ TrackingSchema.statics.createTracking = function(id, content, date, user) {
 TrackingSchema.pre(/^find/, function(next) {
     this.populate({
         path: 'user',
-        select: 'id displayName username email university year image roles'  // Chọn các trường cần thiết
+        select: 'id displayName username email university year image'  // Chọn các trường cần thiết
     });
     next();
 });

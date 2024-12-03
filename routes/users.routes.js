@@ -5,8 +5,8 @@ const verifyToken = require('../middlewares/auth.middleware');
 
 router.get('/get-user-current', verifyToken, async (req, res) => {
     try {
-        // Lấy người dùng hiện tại từ token
-        const user = await User.findById(req.user.id).select('-password');  // Không lấy mật khẩu
+        // Lấy người dùng hiện tại từ accessToken
+        const user = await User.findById(req.user.id).select('-password').populate('roles');  // Không lấy mật khẩu
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
@@ -27,7 +27,7 @@ router.post('/update-myself', verifyToken, async (req, res) => {
 
     try {
         const updatedUser = await User.findByIdAndUpdate(
-            req.user.id,  // Sử dụng id người dùng hiện tại từ token
+            req.user.id,  // Sử dụng id người dùng hiện tại từ accessToken
             { username, email, gender, birthPlace, university, year },
             { new: true }  // Trả về bản ghi đã cập nhật
         );
@@ -36,7 +36,8 @@ router.post('/update-myself', verifyToken, async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        res.status(200).json(updatedUser);  // Trả về người dùng đã cập nhật
+        const populateUser = await updatedUser.populate('roles');
+        res.status(200).json(populateUser);  // Trả về người dùng đã cập nhật và populate
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
@@ -68,7 +69,9 @@ router.post('/update/:id', verifyToken, async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        res.status(200).json(updatedUser);  // Trả về người dùng đã cập nhật
+        const populateUser = await updatedUser.populate('roles');
+
+        res.status(200).json(populateUser);  // Trả về người dùng đã cập nhật và populate
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
@@ -85,7 +88,7 @@ router.get('/token-device', verifyToken, async (req, res) => {
 
     try {
         const updatedUser = await User.findByIdAndUpdate(
-            req.user.id,  // Sử dụng id người dùng hiện tại từ token
+            req.user.id,  // Sử dụng id người dùng hiện tại từ accessToken
             { tokenDevice },  // Lưu tokenDevice vào User
             { new: true }  // Trả về bản ghi đã cập nhật
         );
@@ -100,5 +103,59 @@ router.get('/token-device', verifyToken, async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 });
+
+// Thêm API searchByPage
+router.post('/searchByPage', verifyToken, async (req, res) => {
+    const { keyWord, pageIndex, size, status } = req.body;
+
+    // Xử lý phân trang
+    const page = pageIndex || 0;  // Mặc định là trang 0
+    const pageSize = size || 15;  // Mặc định là 15 người dùng mỗi trang
+
+    // Xử lý điều kiện tìm kiếm
+    const searchConditions = {};
+    if (keyWord) {
+        searchConditions.$or = [
+            { username: { $regex: keyWord, $options: 'i' } },
+            { email: { $regex: keyWord, $options: 'i' } }
+        ];
+    }
+
+    if (status) {
+        searchConditions.status = status;
+    }
+
+    try {
+        const users = await User.find(searchConditions)
+            .skip(page * pageSize)
+            .limit(pageSize)
+            .select('-password')
+            .populate('roles');
+
+        const totalElements = await User.countDocuments(searchConditions);
+        const totalPages = Math.ceil(totalElements / pageSize);
+
+        // Trả về dữ liệu phân trang cho Flutter
+        const response = {
+            content: users,
+            empty: users.length === 0,
+            first: page === 0,
+            last: page === totalPages - 1,
+            number: page,
+            numberOfElements: users.length,
+            size: pageSize,
+            totalElements,
+            totalPages,
+            objPageable: { page, size: pageSize },
+            objSort: { sorted: true, unsorted: false, empty: false } // Đây là dữ liệu giả, có thể tuỳ chỉnh thêm nếu cần
+        };
+
+        res.status(200).json(response);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 
 module.exports = router;
