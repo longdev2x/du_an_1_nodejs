@@ -2,11 +2,16 @@ const express = require('express');
 const router = express.Router();
 const Tracking = require('../models/Tracking');
 const verifyToken = require('../middlewares/auth.middleware');
+const mongoose = require('mongoose');
+
 
 // Lấy danh sách tất cả các tracking
 router.get('/', verifyToken, async (req, res) => {
     try {
-        const trackings = await Tracking.find().populate('user');
+        const objectIdUserId = new mongoose.Types.ObjectId(req.user.id);
+
+
+        const trackings = await Tracking.find({ user: objectIdUserId }).populate('user');
         res.status(200).json(trackings);  // Trả về danh sách tracking
     } catch (error) {
         console.error(error);

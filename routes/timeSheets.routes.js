@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const mongoose = require('mongoose');
+
 
 const TimeSheet = require('../models/TimeSheet');
 const authenticateToken = require('../middlewares/auth.middleware');
@@ -9,13 +11,25 @@ const authenticateToken = require('../middlewares/auth.middleware');
 // Route GET /time-sheets - Lấy danh sách điểm danh
 router.get('/', authenticateToken, async (req, res) => {
     try {
-        const timeSheets = await TimeSheet.find();
+        console.log('User ID từ token:', req.user.id);
+        
+        const objectIdUserId = new mongoose.Types.ObjectId(req.user.id);
+        console.log('Converted ObjectId:', objectIdUserId); 
+
+        const timeSheets = await TimeSheet.find({ user: objectIdUserId });
+        console.log('Kết quả TimeSheet:', timeSheets);
+
+        if (timeSheets.length === 0) {
+            return res.status(404).json({ message: 'Không tìm thấy TimeSheet cho user này' });
+        }
+
         res.status(200).json(timeSheets);
     } catch (error) {
-        console.error('Error fetching time sheets:', error.message);
+        console.error('Lỗi khi lấy TimeSheet:', error.message);
         res.status(500).json({ message: 'Server error' });
     }
 });
+
 
 // Hàm lấy IP Public của server - Không phải ip local, phía client cũng phải getIP Public và gửi lên
 const getServerIP = async () => {

@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const verifyToken = require('../middlewares/auth.middleware');
+const Tracking = require('../models/Tracking');
+const TimeSheet = require('../models/TimeSheet');
 
 router.get('/get-user-current', verifyToken, async (req, res) => {
     try {
@@ -10,6 +12,17 @@ router.get('/get-user-current', verifyToken, async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
+
+
+        // Đếm số lượng Tracking cho mỗi user
+        const countTracking = await Tracking.countDocuments({ user: user._id });
+        user.countDayTracking = countTracking;
+
+        // Đếm số lượng TimeSheet cho mỗi user
+        const countCheckin = await TimeSheet.countDocuments({ user: user._id });
+        user.countDayCheckin = countCheckin;
+
+
         res.status(200).json(user);  // Trả về người dùng
     } catch (error) {
         console.error(error);
@@ -47,10 +60,10 @@ router.post('/update-myself', verifyToken, async (req, res) => {
 // Cập nhật thông tin người dùng theo ID (dành cho Admin)
 router.post('/update/:id', verifyToken, async (req, res) => {
     const { id } = req.params;
-    const { username, email, gender, birthPlace, university, year } = req.body;
+    const { username, email, gender, birthPlace, university, year, displayName } = req.body;
 
     // Kiểm tra xem người dùng có quyền Admin không
-    if (!req.user.roles.includes('ROLE_ADMIN')) {
+    if (!req.user.roles || !req.user.roles.some(role => role.authority === 'ROLE_ADMIN')) {
         return res.status(403).json({ message: 'Access denied, Admin role required' });
     }
 
@@ -61,7 +74,7 @@ router.post('/update/:id', verifyToken, async (req, res) => {
     try {
         const updatedUser = await User.findByIdAndUpdate(
             id,  // Cập nhật người dùng theo ID
-            { username, email, gender, birthPlace, university, year },
+            { username, email, gender, birthPlace, university, year, displayName },
             { new: true }  // Trả về bản ghi đã cập nhật
         );
 
@@ -77,6 +90,36 @@ router.post('/update/:id', verifyToken, async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 });
+
+
+// Xoá User (dành cho Admin)
+router.post('/bloc/:id', verifyToken, async (req, res) => {
+    const { id } = req.params;
+
+    // Kiểm tra xem người dùng có quyền Admin không
+    if (!req.user.roles || !req.user.roles.some(role => role.authority === 'ROLE_ADMIN')) {
+        return res.status(403).json({ message: 'Access denied, Admin role required' });
+    }
+
+    try {
+        // Xóa người dùng theo ID
+        const deletedUser = await User.findByIdAndDelete(id);
+
+        if (!deletedUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.status(200).json({
+            message: 'User has been deleted successfully',
+            user: deletedUser,  // Trả về thông tin người dùng đã bị xóa
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+
 
 // Lưu deviceToken vào User (dùng cho mobile hoặc web app)
 router.get('/token-device', verifyToken, async (req, res) => {
@@ -131,6 +174,18 @@ router.post('/searchByPage', verifyToken, async (req, res) => {
             .limit(pageSize)
             .select('-password')
             .populate('roles');
+
+        // Đếm số lượng Tracking và TimeSheet cho mỗi User
+        for (let user of users) {
+            // Đếm số lượng Tracking cho mỗi user
+            const countTracking = await Tracking.countDocuments({ user: user._id });
+            user.countDayTracking = countTracking;
+
+            // Đếm số lượng TimeSheet cho mỗi user
+            const countCheckin = await TimeSheet.countDocuments({ user: user._id });
+            user.countDayCheckin = countCheckin;
+        }
+
 
         const totalElements = await User.countDocuments(searchConditions);
         const totalPages = Math.ceil(totalElements / pageSize);

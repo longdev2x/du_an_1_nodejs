@@ -15,7 +15,7 @@ const PostsSchema = new Schema(
         },
         user: {
             type: Schema.Types.ObjectId,
-            ref: 'Users', // Kết nối đúng với schema `Users`
+            ref: 'User', // Kết nối đúng với schema `Users`
             required: true,
         },
         media: [
@@ -50,32 +50,16 @@ const PostsSchema = new Schema(
     }
 );
 
-// Middleware auto-populate để đảm bảo chuẩn response
+// Auto populate
 PostsSchema.pre(/^find/, function (next) {
     this.populate({
-        path: 'user',
-        select: 'id displayName username email gender university year roles',
-    })
-        .populate({
-            path: 'media',
-            select: 'id contentType contentSize name filePath',
-        })
-        .populate({
-            path: 'likes',
-            select: 'id type date user',
-            populate: {
-                path: 'user',
-                select: 'id username',
-            },
-        })
-        .populate({
-            path: 'comments',
-            select: 'id content date user',
-            populate: {
-                path: 'user',
-                select: 'id username',
-            },
-        });
+        path: 'likes',
+        select: 'id type date user',
+        populate: {
+            path: 'user',
+            select: 'id username displayName',
+        }
+    });
     next();
 });
 
@@ -84,19 +68,6 @@ PostsSchema.pre(/^find/, function (next) {
 PostsSchema.statics.create = function(data) {
     return new this(data);
 };
-
-
-// Middleware auto-populate khi query
-PostsSchema.pre(/^find/, function(next) {
-    this.populate('user')
-        .populate({
-            path: 'media',
-            model: 'Media', // Kết nối với model Media
-        })
-        .populate('likes')
-        .populate('comments');
-    next();
-});
 
 // Sử dụng mongooseAggregatePaginate plugin
 PostsSchema.plugin(mongooseAggregatePaginate);

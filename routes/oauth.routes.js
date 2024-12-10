@@ -32,7 +32,7 @@ router.post('/token', async (req, res) => {
         }
 
         // Tạo JWT accessToken
-        const accessToken = jwt.sign({ id: user._id, username: user.username }, jwtSecret, { expiresIn: jwtExpiresIn });
+        const accessToken = jwt.sign({ id: user._id, username: user.username, roles: user.roles}, jwtSecret, { expiresIn: jwtExpiresIn });
 
         // Trả về accessToken cùng thông tin người dùng
         res.status(200).json({

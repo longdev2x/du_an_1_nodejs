@@ -59,7 +59,7 @@ app.use('/shoes', shoeRoute);
 app.use('/cart', cartRoute);
 
 //Lab56
-apiRoute.use('/api', apiRoute);
+app.use('/api', apiRoute);
 
 
 // catch 404 and forward to error handler
@@ -77,6 +77,7 @@ app.use(function(err, req, res, next) {
   res.status(err.status || 500);
   res.render('error');
 });
+
 
 module.exports = app;
 
